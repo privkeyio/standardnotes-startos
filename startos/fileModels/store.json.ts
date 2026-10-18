@@ -1,24 +1,16 @@
 import { z, FileHelper } from '@start9labs/start-sdk'
 import { sdk } from '../sdk'
 
-// Package-internal state. Written only by our init + actions, so .const()
-// gives automatic restart-on-change.
 const storeConfigSchema = z.looseObject({
-  // Generated once at install; each is 32 random bytes as hex (openssl rand
-  // -hex 32). They sign tokens and encrypt server-side secrets, so they must
-  // stay stable across restarts and survive in the backed-up main volume.
+  // Generated once at install; they sign sessions and encrypt server data.
   jwtSecret: z.string().catch(''),
   authJwtSecret: z.string().catch(''),
   encryptionServerKey: z.string().catch(''),
   pseudoKeyParamsKey: z.string().catch(''),
   valetTokenSecret: z.string().catch(''),
-  // Public URL clients use to reach the files server. Set this to the address
-  // you point your Standard Notes app at if you upload files. Empty = unset.
+  adminKey: z.string().catch(''),
   filesServerUrl: z.string().catch(''),
-  // Temporarily exposes the unauthenticated premium-activation endpoint
-  // (E2E_TESTING) so a self-hosted account can be granted a subscription. Also
-  // forces legacy sessions while on, so leave it off except during activation.
-  premiumActivationMode: z.boolean().catch(false),
+  signupsAllowed: z.boolean().catch(true),
 })
 
 export type StoreConfig = z.infer<typeof storeConfigSchema>

@@ -2,27 +2,28 @@
 
 ## Documentation
 
-- [Self-hosting the web app](https://standardnotes.com/help/self-hosting/web-app) — run your own copy of the Standard Notes web app and point it at this server.
-- [File uploads on a self-hosted server](https://standardnotes.com/help/self-hosting/file-uploads) — upstream notes on the files server URL and upload troubleshooting.
+- [Standard Notes Help](https://standardnotes.com/help/*) — the upstream help center: using the apps, custom sync servers, and self-hosting.
 
 ## What you get on StartOS
 
-A private sync server for the Standard Notes apps. It exposes one **Server API** address that the desktop, mobile, and web apps connect to. Your encrypted notes, tags, uploaded files, and revision history are stored on your server. There is no web page to open; you use it from the Standard Notes apps.
+A private sync server for the Standard Notes apps, with the Standard Notes web app built in. Open the **Web App** interface in a browser, or point the desktop and mobile apps at the **Server API** address. Your encrypted notes, tags, uploaded files, and revision history are stored on your server.
 
 ## Getting set up
 
-1. **Find this server's address.** Open this service's page in StartOS and copy the **Server API** interface address. The LAN address is served over HTTPS using your server's own root CA, so its address looks like `https://<host>` (or `https://<ip>:<port>`).
-2. **Trust the certificate** on the device you connect from (see [Trusting the HTTPS certificate](#trusting-the-https-certificate) below). This is the most common cause of a "Failed to fetch" error.
-3. **Point your Standard Notes app at it.** In the Standard Notes app, open the account / advanced options, choose to use a custom sync server, and enter the address from step 1.
-4. **Register an account.** Create your account from within the app. Your notes are encrypted on the client before they reach the server.
+1. **Trust the certificate** on each device you connect from (see [Trusting the HTTPS certificate](#trusting-the-https-certificate) below). The LAN addresses are served over HTTPS with your server's own root CA, and an untrusted certificate is the most common cause of a "Failed to fetch" error.
+2. **In a browser,** open the **Web App** interface. It already uses this server; no address needs entering.
+3. **In the desktop or mobile app,** copy the **Server API** address from this service's page. In the app's sign-in screen, open the advanced options, choose a custom sync server, and enter that address.
+4. **Register your accounts.** Create each account from the web app or an app. Your notes are encrypted on the device before they reach the server.
+5. **Disable signups.** Run the **Disable Signups** task. Until you do, anyone who can reach the address can create an account on your server. The **Signups** health check stays failed while signups are open.
+6. **Choose the files address** if you will upload files. Run **Set Files URL** and pick an address every device you use can reach.
 
-You can use the official desktop, mobile, or web app (<https://app.standardnotes.com>), or a web app you host yourself (see [Self-hosting the web app](https://standardnotes.com/help/self-hosting/web-app)).
+Use this service's **Web App** rather than app.standardnotes.com: the hosted web app cannot connect to your server, because its browser security policy only allows Standard Notes' own servers.
 
 ## Trusting the HTTPS certificate
 
 The Server API LAN address uses an HTTPS certificate signed by your StartOS server's own root CA. Clients reject this certificate until they trust that CA, which shows up as **"Failed to fetch"** when you try to sign in. Download your server's root CA from StartOS (**System → Root CA**, "Download Certificate") and install it on each device you connect from.
 
-- **Most browsers / OSes:** install the CA into the system or browser trust store, then use the official web app or your browser.
+- **Most browsers / OSes:** install the CA into the system or browser trust store.
 - **Chromium / Electron on Linux** (this includes the **Standard Notes desktop app**): Chromium does not use the system CA store on Linux — it uses the NSS database. Add the CA with `certutil` (from `libnss3-tools`):
 
   ```sh
@@ -48,14 +49,11 @@ curl --cacert /path/to/root-ca.crt https://<server-api-address>/healthcheck
 
 A response with no certificate error means the server and CA are trusted; only the app's trust store remains.
 
-## Configuration
+## Actions
 
-Use the **Configure** action to set:
-
-- **Files Server URL:** the public HTTPS address of this server, such as `https://notes.example.com`. The home server handles file uploads at the same address as sync, and every client sends uploads to this URL. Always use the public address, even if your desktop app connects through the `localhost:3123` tunnel described under [Unlocking premium on desktop](#unlocking-premium-on-desktop): a `localhost` value sends every other client's uploads to its own machine, so they fail. Leave blank to disable file uploads.
-- **Premium Activation Mode:** temporarily exposes an unauthenticated endpoint used to grant a subscription to a self-hosted account (see [Premium features](#premium-features)). Leave it off except while activating; it also forces legacy sessions while enabled.
-
-Saving the configuration restarts the service.
+- **Disable Signups / Enable Signups:** closes or reopens registration. Existing accounts are unaffected. Reopen it briefly to add an account, then close it again.
+- **Set Files URL:** chooses the address the apps send file uploads to. Pick one every device can reach — a domain or Tor address for devices away from home, not the `.local` address.
+- **Activate Premium:** grants an account a premium subscription (see [Premium features](#premium-features)). Stop the service first; the action is available only while it is stopped.
 
 ## Premium features
 
@@ -69,68 +67,33 @@ The official Standard Notes apps only honor an online subscription when connecte
 - `sync.standardnotes.org`
 - `localhost:3123`
 
-Any other sync server — including this self-hosted one at its StartOS address or your own domain — is treated as a **third-party host**, and the apps **ignore the online subscription for premium unlocking**. Your notes still sync perfectly; only the premium editors and themes stay locked. This is a client-side design decision and cannot be changed from the server.
+Any other sync server — including this self-hosted one at its StartOS address or your own domain, and this package's own **Web App** opened at those addresses — is treated as a **third-party host**, and the apps **ignore the online subscription for premium unlocking**. Your notes still sync perfectly; only the premium editors and themes stay locked. This is a client-side design decision and cannot be changed from the server.
 
-Because `localhost:3123` is on that list, the workaround is to make this server reachable at `https://localhost:3123` on your computer (see [Unlocking premium on desktop](#unlocking-premium-on-desktop)).
+Because `localhost:3123` is on that list, the workaround is to make this server reachable at `localhost:3123` on your computer (see [Unlocking premium in the Web App](#unlocking-premium-in-the-web-app) and [Unlocking premium in the desktop app](#unlocking-premium-in-the-desktop-app)).
 
 ### Granting the subscription
 
-1. In the **Configure** action, turn **Premium Activation Mode** ON and save.
-2. Grant your account a subscription. Run the following from a terminal on any computer that can reach the server's API address over the network and has the root CA file (for example your own laptop or desktop — not on the StartOS server itself, and not inside the app). Replace the email, CA path, and server address:
+1. Create the account in a Standard Notes app first.
+2. Stop the service, run **Activate Premium**, and enter the account's email.
+3. Start the service again.
 
-   ```sh
-   curl --cacert /path/to/root-ca.crt -X POST https://<server-api-address>/e2e/activate-premium \
-     -H 'Content-Type: application/json' \
-     -d '{"username":"you@example.com","subscriptionId":1,"subscriptionPlanName":"PRO_PLAN","uploadBytesLimit":107374182400,"endsAt":4102444800000}'
-   ```
+The grant lasts until the year 2100 and survives restarts, updates, and backups. Running it again for the same account replaces the earlier grant. By itself it unlocks nothing in the app until the app is connected through a first-party host.
 
-   `endsAt` is a millisecond timestamp (the example is the year 2100). A `{"message":"Premium features activated."}` response means the `PRO_USER` role and subscription are stored in your data volume (and captured by backups).
-3. Turn **Premium Activation Mode** OFF and save.
+### Unlocking premium in the Web App
 
-The grant persists across restarts, updates, and backups. By itself it unlocks nothing in the app until the app is connected through a first-party host.
-
-### Unlocking premium on desktop
-
-Premium unlocks only when the desktop app reaches the server at `https://localhost:3123`. Run a local proxy on port `3123` that forwards to your server, then point the app at it. There are two ways to set up the proxy, depending on which certificate your server's address presents.
-
-#### Option A — forward to the StartOS address (StartOS certificate)
-
-Use this when you connect to the server's StartOS LAN/clearnet address, which serves a certificate signed by your StartOS root CA. That certificate already includes a `localhost` SAN, so a plain TCP passthrough validates once the root CA is trusted (see [Trusting the HTTPS certificate](#trusting-the-https-certificate)).
-
-One-off (stops when the terminal closes):
+Premium unlocks when the web app is loaded from `localhost:3123`, because it syncs with the address it is loaded from. On the computer you browse from, forward that port to the **Web App** interface's LAN address, using your server's root CA (see [Trusting the HTTPS certificate](#trusting-the-https-certificate)) to verify the connection:
 
 ```sh
-socat TCP-LISTEN:3123,reuseaddr,fork TCP:<server-ip>:<server-port>
+socat TCP-LISTEN:3123,bind=127.0.0.1,reuseaddr,fork OPENSSL:<server-ip>:<web-app-port>,cafile=/path/to/root-ca.crt
 ```
 
-Persistent (Linux, systemd user service):
+`<server-ip>` and `<web-app-port>` come from the Web App's LAN address. Open `http://localhost:3123` in your browser, sign out fully, and sign back in. To keep the forward running, put the same command in a systemd user service as shown below.
 
-```sh
-mkdir -p ~/.config/systemd/user
-cat > ~/.config/systemd/user/sn-tunnel.service <<'EOF'
-[Unit]
-Description=Standard Notes localhost:3123 tunnel to StartOS
-After=network-online.target
-Wants=network-online.target
+If this computer also runs the desktop app's proxy below, use that proxy instead: both need port `3123`, and one proxy pointed at the Web App serves both.
 
-[Service]
-ExecStart=/usr/bin/socat TCP-LISTEN:3123,reuseaddr,fork TCP:<server-ip>:<server-port>
-Restart=always
-RestartSec=3
+### Unlocking premium in the desktop app
 
-[Install]
-WantedBy=default.target
-EOF
-systemctl --user daemon-reload
-systemctl --user enable --now sn-tunnel.service
-loginctl enable-linger "$USER"   # keep it running across logout/reboot
-```
-
-The drawback is that `<server-ip>:<server-port>` is the StartOS address, which can change; update the service and run `systemctl --user restart sn-tunnel.service` if it does.
-
-#### Option B — forward to a public domain (its own TLS certificate)
-
-Use this when you front the server with a public domain (for example `notes.example.com`) that serves its own certificate, such as Let's Encrypt. A plain passthrough fails here: the app connects to `https://localhost:3123` but is handed a certificate for the domain, so the hostname does not match. Instead, terminate TLS at the proxy — present a self-signed `localhost` certificate to the app, and have `socat` open its own TLS connection out to the domain. This is also more stable, since it does not depend on the changing StartOS LAN address.
+Premium unlocks only when the desktop app reaches the server at `https://localhost:3123`. StartOS does not answer TLS for the name `localhost`, and a public domain's certificate does not match it, so a plain passthrough fails either way. Instead, terminate TLS at a local proxy: present a self-signed `localhost` certificate to the app, and have `socat` open its own TLS connection to your server.
 
 1. Generate a self-signed `localhost` certificate (once; reuse the files on every desktop):
 
@@ -149,9 +112,9 @@ Use this when you front the server with a public domain (for example `notes.exam
      -n "Local localhost proxy" -i ~/.config/sn-tunnel/localhost.crt
    ```
 
-   This is your own `localhost` certificate, not the StartOS root CA — do not import the StartOS CA for this option.
-
-3. Run the TLS-terminating proxy as a systemd user service (replace `<your-domain>`):
+3. Run the TLS-terminating proxy as a systemd user service. Its upstream is one of:
+   - **The Web App's LAN address:** `OPENSSL:<server-ip>:<web-app-port>,cafile=/path/to/root-ca.crt`, verified against your server's root CA. The Web App also serves the server's API, so this one proxy serves the desktop app and, at `https://localhost:3123`, the web app in a browser that trusts `localhost.crt`. The LAN address can change; update the service if it does.
+   - **A public domain** you added to the Web App or the Server API: `OPENSSL:<your-domain>:443`, verified against the domain's own certificate. A domain on the Web App serves both, as above.
 
    ```sh
    mkdir -p ~/.config/systemd/user
@@ -162,7 +125,7 @@ Use this when you front the server with a public domain (for example `notes.exam
    Wants=network-online.target
 
    [Service]
-   ExecStart=/usr/bin/socat OPENSSL-LISTEN:3123,reuseaddr,fork,cert=%h/.config/sn-tunnel/localhost.pem,verify=0 OPENSSL:<your-domain>:443,verify=1
+   ExecStart=/usr/bin/socat OPENSSL-LISTEN:3123,reuseaddr,fork,cert=%h/.config/sn-tunnel/localhost.pem,verify=0 <upstream>
    Restart=always
    RestartSec=3
 
@@ -182,14 +145,14 @@ Use this when you front the server with a public domain (for example `notes.exam
 
    An `OK` response means the proxy presents your `localhost` certificate and reaches the server.
 
-With either option, set the desktop app's custom sync server to `https://localhost:3123`, sign out fully, and sign back in — the premium editors unlock. Sessions are bound to the address, so a session created against another address (the LAN or public domain) will not carry the unlock; sign in fresh on `localhost:3123`.
+Then set the desktop app's custom sync server to `https://localhost:3123`, sign out fully, and sign back in — the premium editors unlock. Sessions are bound to the address, so a session created against another address (the LAN or public domain) will not carry the unlock; sign in fresh on `localhost:3123`.
 
 > `systemctl --user enable --now` does **not** restart an already-running service. If you change the unit file, run `systemctl --user restart sn-tunnel.service`. With a snap install, re-run the `certutil` import after each snap revision update.
 
 ### Limitations
 
 - **Mobile and other devices:** there is no `localhost` server on a phone, so the tunnel cannot work there. Premium on the official mobile apps against a self-hosted server is not achievable.
-- **Custom public domains (direct connection):** pointing the app straight at a domain such as `notes.example.com` is still a third-party host, so premium stays locked; sync works. You can, however, use that domain as the upstream for a `localhost:3123` tunnel (see **Option B** above), which does unlock premium.
+- **Custom public domains (direct connection):** pointing the app straight at a domain such as `notes.example.com` is still a third-party host, so premium stays locked; sync works. You can, however, use that domain as the upstream for the desktop app's `localhost:3123` proxy, which does unlock premium.
 - **Offline activation does not work here:** the home server's offline-features endpoint cannot identify the user in single-process mode, and the apps only accept `localhost` as an offline features host, so this path is a dead end.
 - The only way to get tunnel-free premium (including on mobile) is to run a **patched Standard Notes app** that adds your host to its first-party allowlist — a separate project outside this package.
 
@@ -198,7 +161,7 @@ With either option, set the desktop app's custom sync server to `https://localho
 The server has no admin page or API for listing accounts. To see who has registered, SSH into your StartOS server, open a shell in the service, and query its database (read-only, safe while the server is running):
 
 ```sh
-sudo start-cli package attach standardnotes-server
+sudo start-cli package attach standardnotes-server -n standardnotes-server
 cd /opt/server/packages/auth && yarn node -e 'const s=require("sqlite3");const db=new s.Database("/data/database/home_server.sqlite",s.OPEN_READONLY);db.all("SELECT u.email, u.created_at, GROUP_CONCAT(r.name) AS roles FROM users u LEFT JOIN user_roles ur ON ur.user_uuid=u.uuid LEFT JOIN roles r ON r.uuid=ur.role_uuid GROUP BY u.uuid ORDER BY u.created_at",(e,rows)=>{if(e)throw e;console.table(rows)})'
 exit
 ```

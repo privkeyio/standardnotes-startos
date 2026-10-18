@@ -1,6 +1,6 @@
 FROM node:20.19-alpine
 
-RUN apk add --no-cache g++ make python3 openssl bash curl redis
+RUN apk add --no-cache g++ make python3 openssl bash
 
 WORKDIR /opt/server
 
@@ -10,10 +10,7 @@ RUN corepack enable && \
     yarn install --immutable && \
     CI=true yarn build
 
-COPY docker_entrypoint.sh /usr/local/bin/docker_entrypoint.sh
-RUN chmod +x /usr/local/bin/docker_entrypoint.sh
+# The home server keeps its data at ${__dirname}/../data of dist/bin/server.js.
+RUN rm -rf packages/home-server/dist/data && ln -s /data packages/home-server/dist/data
 
-EXPOSE 3000
-ENV PORT=3000
-
-ENTRYPOINT ["/usr/local/bin/docker_entrypoint.sh"]
+COPY activate-premium.js packages/home-server/
